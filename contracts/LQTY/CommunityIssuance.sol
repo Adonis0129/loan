@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
 
-pragma solidity 0.6.11;
-
-import "../Interfaces/ILQTYToken.sol";
+import "../abstracts/BaseContract.sol";
+import "../Interfaces/ILOANToken.sol";
 import "../Interfaces/ICommunityIssuance.sol";
 import "../Dependencies/BaseMath.sol";
 import "../Dependencies/LiquityMath.sol";
-import "../Dependencies/Ownable.sol";
 import "../Dependencies/CheckContract.sol";
-import "../Dependencies/SafeMath.sol";
 
 
-contract CommunityIssuance is ICommunityIssuance, Ownable, CheckContract, BaseMath {
+contract CommunityIssuance is BaseContract, ICommunityIssuance, CheckContract, BaseMath {
     using SafeMath for uint;
 
     // --- Data ---
@@ -37,65 +35,62 @@ contract CommunityIssuance is ICommunityIssuance, Ownable, CheckContract, BaseMa
     uint constant public ISSUANCE_FACTOR = 999998681227695000;
 
     /* 
-    * The community LQTY supply cap is the starting balance of the Community Issuance contract.
-    * It should be minted to this contract by LQTYToken, when the token is deployed.
+    * The community LOAN supply cap is the starting balance of the Community Issuance contract.
+    * It should be minted to this contract by LOANToken, when the token is deployed.
     * 
-    * Set to 32M (slightly less than 1/3) of total LQTY supply.
+    * Set to 32M (slightly less than 1/3) of total LOAN supply.
     */
-    uint constant public LQTYSupplyCap = 32e24; // 32 million
+    uint constant public LOANSupplyCap = 32e24; // 32 million
 
-    ILQTYToken public lqtyToken;
+    ILOANToken public loanToken;
 
     address public stabilityPoolAddress;
 
-    uint public totalLQTYIssued;
+    uint public totalLOANIssued;
     uint public immutable deploymentTime;
 
     // --- Events ---
 
-    event LQTYTokenAddressSet(address _lqtyTokenAddress);
+    event LOANTokenAddressSet(address _loanTokenAddress);
     event StabilityPoolAddressSet(address _stabilityPoolAddress);
-    event TotalLQTYIssuedUpdated(uint _totalLQTYIssued);
+    event TotalLOANIssuedUpdated(uint _totalLOANIssued);
 
-    // --- Functions ---
-
-    constructor() public {
+    function initialize() public initializer {
+        __BaseContract_init();
         deploymentTime = block.timestamp;
     }
 
     function setAddresses
     (
-        address _lqtyTokenAddress, 
+        address _loanTokenAddress, 
         address _stabilityPoolAddress
     ) 
         external 
         onlyOwner 
         override 
     {
-        checkContract(_lqtyTokenAddress);
+        checkContract(_loanTokenAddress);
         checkContract(_stabilityPoolAddress);
 
-        lqtyToken = ILQTYToken(_lqtyTokenAddress);
+        loanToken = ILOANToken(_loanTokenAddress);
         stabilityPoolAddress = _stabilityPoolAddress;
 
-        // When LQTYToken deployed, it should have transferred CommunityIssuance's LQTY entitlement
-        uint LQTYBalance = lqtyToken.balanceOf(address(this));
-        assert(LQTYBalance >= LQTYSupplyCap);
+        // When LOANToken deployed, it should have transferred CommunityIssuance's LOAN entitlement
+        uint LOANBalance = loanToken.balanceOf(address(this));
+        assert(LOANBalance >= LOANSupplyCap);
 
-        emit LQTYTokenAddressSet(_lqtyTokenAddress);
+        emit LOANTokenAddressSet(_loanTokenAddress);
         emit StabilityPoolAddressSet(_stabilityPoolAddress);
-
-        _renounceOwnership();
     }
 
-    function issueLQTY() external override returns (uint) {
+    function issueLOAN() external override returns (uint) {
         _requireCallerIsStabilityPool();
 
-        uint latestTotalLQTYIssued = LQTYSupplyCap.mul(_getCumulativeIssuanceFraction()).div(DECIMAL_PRECISION);
-        uint issuance = latestTotalLQTYIssued.sub(totalLQTYIssued);
+        uint latestTotalLOANIssued = LOANSupplyCap.mul(_getCumulativeIssuanceFraction()).div(DECIMAL_PRECISION);
+        uint issuance = latestTotalLOANIssued.sub(totalLOANIssued);
 
-        totalLQTYIssued = latestTotalLQTYIssued;
-        emit TotalLQTYIssuedUpdated(latestTotalLQTYIssued);
+        totalLOANIssued = latestTotalLOANIssued;
+        emit TotalLOANIssuedUpdated(latestTotalLOANIssued);
         
         return issuance;
     }
@@ -103,7 +98,7 @@ contract CommunityIssuance is ICommunityIssuance, Ownable, CheckContract, BaseMa
     /* Gets 1-f^t    where: f < 1
 
     f: issuance factor that determines the shape of the curve
-    t:  time passed since last LQTY issuance event  */
+    t:  time passed since last LOAN issuance event  */
     function _getCumulativeIssuanceFraction() internal view returns (uint) {
         // Get the time passed since deployment
         uint timePassedInMinutes = block.timestamp.sub(deploymentTime).div(SECONDS_IN_ONE_MINUTE);
@@ -118,10 +113,10 @@ contract CommunityIssuance is ICommunityIssuance, Ownable, CheckContract, BaseMa
         return cumulativeIssuanceFraction;
     }
 
-    function sendLQTY(address _account, uint _LQTYamount) external override {
+    function sendLOAN(address _account, uint _LOANamount) external override {
         _requireCallerIsStabilityPool();
 
-        lqtyToken.transfer(_account, _LQTYamount);
+        loanToken.transfer(_account, _LOANamount);
     }
 
     // --- 'require' functions ---

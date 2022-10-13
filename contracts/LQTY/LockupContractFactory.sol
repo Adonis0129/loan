@@ -1,29 +1,27 @@
 // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
 
-pragma solidity 0.6.11;
-
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "../abstracts/BaseContract.sol";
 import "../Dependencies/CheckContract.sol";
-import "../Dependencies/SafeMath.sol";
-import "../Dependencies/Ownable.sol";
 import "../Interfaces/ILockupContractFactory.sol";
 import "./LockupContract.sol";
-import "../Dependencies/console.sol";
 
 /*
 * The LockupContractFactory deploys LockupContracts - its main purpose is to keep a registry of valid deployed 
 * LockupContracts. 
 * 
-* This registry is checked by LQTYToken when the Liquity deployer attempts to transfer LQTY tokens. During the first year 
-* since system deployment, the Liquity deployer is only allowed to transfer LQTY to valid LockupContracts that have been 
-* deployed by and recorded in the LockupContractFactory. This ensures the deployer's LQTY can't be traded or staked in the
+* This registry is checked by LOANToken when the Liquity deployer attempts to transfer LOAN tokens. During the first year 
+* since system deployment, the Liquity deployer is only allowed to transfer LOAN to valid LockupContracts that have been 
+* deployed by and recorded in the LockupContractFactory. This ensures the deployer's LOAN can't be traded or staked in the
 * first year, and can only be sent to a verified LockupContract which unlocks at least one year after system deployment.
 *
 * LockupContracts can of course be deployed directly, but only those deployed through and recorded in the LockupContractFactory 
-* will be considered "valid" by LQTYToken. This is a convenient way to verify that the target address is a genuine 
+* will be considered "valid" by LOANToken. This is a convenient way to verify that the target address is a genuine 
 * LockupContract.
 */
 
-contract LockupContractFactory is ILockupContractFactory, Ownable, CheckContract {
+contract LockupContractFactory is BaseContract, ILockupContractFactory, CheckContract {
     using SafeMath for uint;
 
     // --- Data ---
@@ -31,31 +29,33 @@ contract LockupContractFactory is ILockupContractFactory, Ownable, CheckContract
 
     uint constant public SECONDS_IN_ONE_YEAR = 31536000;
 
-    address public lqtyTokenAddress;
+    address public loanTokenAddress;
     
     mapping (address => address) public lockupContractToDeployer;
 
     // --- Events ---
 
-    event LQTYTokenAddressSet(address _lqtyTokenAddress);
+    event LOANTokenAddressSet(address _loanTokenAddress);
     event LockupContractDeployedThroughFactory(address _lockupContractAddress, address _beneficiary, uint _unlockTime, address _deployer);
+
+    function initialize() public initializer {
+        __BaseContract_init();
+    }
 
     // --- Functions ---
 
-    function setLQTYTokenAddress(address _lqtyTokenAddress) external override onlyOwner {
-        checkContract(_lqtyTokenAddress);
+    function setLOANTokenAddress(address _loanTokenAddress) external override onlyOwner {
+        checkContract(_loanTokenAddress);
 
-        lqtyTokenAddress = _lqtyTokenAddress;
-        emit LQTYTokenAddressSet(_lqtyTokenAddress);
-
-        _renounceOwnership();
+        loanTokenAddress = _loanTokenAddress;
+        emit LOANTokenAddressSet(_loanTokenAddress);
     }
 
     function deployLockupContract(address _beneficiary, uint _unlockTime) external override {
-        address lqtyTokenAddressCached = lqtyTokenAddress;
-        _requireLQTYAddressIsSet(lqtyTokenAddressCached);
+        address loanTokenAddressCached = loanTokenAddress;
+        _requireLOANAddressIsSet(loanTokenAddressCached);
         LockupContract lockupContract = new LockupContract(
-                                                        lqtyTokenAddressCached,
+                                                        loanTokenAddressCached,
                                                         _beneficiary, 
                                                         _unlockTime);
 
@@ -68,7 +68,7 @@ contract LockupContractFactory is ILockupContractFactory, Ownable, CheckContract
     }
 
     // --- 'require'  functions ---
-    function _requireLQTYAddressIsSet(address _lqtyTokenAddress) internal pure {
-        require(_lqtyTokenAddress != address(0), "LCF: LQTY Address is not set");
+    function _requireLOANAddressIsSet(address _loanTokenAddress) internal pure {
+        require(_loanTokenAddress != address(0), "LCF: LOAN Address is not set");
     }
 }

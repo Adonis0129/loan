@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.6.11;
+pragma solidity ^0.8.4;
 
 import "./Interfaces/IPriceFeed.sol";
 import "./Interfaces/ITellorCaller.sol";
@@ -118,7 +117,7 @@ contract PriceFeed is Ownable, CheckContract, BaseMath, IPriceFeed {
     * fetchPrice():
     * Returns the latest price obtained from the Oracle. Called by Liquity functions that require a current price.
     *
-    * Also callable by anyone externally.
+    * Also callable by anyone externally. 
     *
     * Non-view function - it stores the last good price seen by Liquity.
     *
