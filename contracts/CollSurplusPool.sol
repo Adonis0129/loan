@@ -1,67 +1,67 @@
 // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
 
-pragma solidity 0.6.11;
-
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "./abstracts/BaseContract.sol";
 import "./Interfaces/ICollSurplusPool.sol";
-import "./Dependencies/SafeMath.sol";
-import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
-import "./Dependencies/console.sol";
 
 
-contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
+contract CollSurplusPool is BaseContract, CheckContract, ICollSurplusPool {
+
     using SafeMath for uint256;
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     string constant public NAME = "CollSurplusPool";
 
     address public borrowerOperationsAddress;
     address public troveManagerAddress;
     address public activePoolAddress;
+    address public furFiAddress;
 
-    // deposited ether tracker
-    uint256 internal ETH;
+    // deposited FURFI tracker
+    uint256 internal FURFI;
     // Collateral surplus claimable by trove owners
     mapping (address => uint) internal balances;
 
     // --- Events ---
-
-    event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
-    event TroveManagerAddressChanged(address _newTroveManagerAddress);
-    event ActivePoolAddressChanged(address _newActivePoolAddress);
-
     event CollBalanceUpdated(address indexed _account, uint _newBalance);
-    event EtherSent(address _to, uint _amount);
-    
+    event CollSurplusPoolFURFIBalanceUpdated(uint _FURFI);
+    event FURFISent(address _to, uint _amount);
+
+    function initialize() public initializer {
+        __BaseContract_init();
+    }
+
     // --- Contract setters ---
 
     function setAddresses(
         address _borrowerOperationsAddress,
         address _troveManagerAddress,
-        address _activePoolAddress
+        address _activePoolAddress,
+        address _furFiAddress
     )
         external
-        override
         onlyOwner
     {
         checkContract(_borrowerOperationsAddress);
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
+        checkContract(_furFiAddress);
 
         borrowerOperationsAddress = _borrowerOperationsAddress;
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
+        furFiAddress = _furFiAddress;
 
-        emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
-        emit TroveManagerAddressChanged(_troveManagerAddress);
-        emit ActivePoolAddressChanged(_activePoolAddress);
-
-        _renounceOwnership();
     }
 
-    /* Returns the ETH state variable at ActivePool address.
-       Not necessarily equal to the raw ether balance - ether can be forcibly sent to contracts. */
-    function getETH() external view override returns (uint) {
-        return ETH;
+    /* Returns the FURFI state variable at ActivePool address.
+       Not necessarily equal to the raw FURFI balance - FURFI can be forcibly sent to contracts. */
+    function getFURFI() external view override returns (uint) {
+        return FURFI;
     }
 
     function getCollateral(address _account) external view override returns (uint) {
@@ -87,11 +87,19 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         balances[_account] = 0;
         emit CollBalanceUpdated(_account, 0);
 
-        ETH = ETH.sub(claimableColl);
-        emit EtherSent(_account, claimableColl);
+        FURFI = FURFI.sub(claimableColl);
+        emit CollSurplusPoolFURFIBalanceUpdated(claimableColl);
+        emit FURFISent(_account, claimableColl);
 
-        (bool success, ) = _account.call{ value: claimableColl }("");
-        require(success, "CollSurplusPool: sending ETH failed");
+        IERC20Upgradeable FurFiToken = IERC20Upgradeable(furFiAddress);
+        FurFiToken.safeTransfer(_account, claimableColl);
+    }
+
+    //called by only ActivePool after send FURFI
+    function receiveFURFI(uint _amount) external override {
+        _requireCallerIsActivePool();
+        FURFI = FURFI.add(_amount);
+        emit CollSurplusPoolFURFIBalanceUpdated(_amount);
     }
 
     // --- 'require' functions ---
@@ -112,12 +120,5 @@ contract CollSurplusPool is Ownable, CheckContract, ICollSurplusPool {
         require(
             msg.sender == activePoolAddress,
             "CollSurplusPool: Caller is not Active Pool");
-    }
-
-    // --- Fallback function ---
-
-    receive() external payable {
-        _requireCallerIsActivePool();
-        ETH = ETH.add(msg.value);
     }
 }

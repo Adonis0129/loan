@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
 
-pragma solidity 0.6.11;
+interface IActivePool {
 
-import "./IPool.sol";
+    function getFURFI() external view returns (uint);
 
+    function getFURUSDDebt() external view returns (uint);
 
-interface IActivePool is IPool {
-    // --- Events ---
-    event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
-    event TroveManagerAddressChanged(address _newTroveManagerAddress);
-    event ActivePoolLUSDDebtUpdated(uint _LUSDDebt);
-    event ActivePoolETHBalanceUpdated(uint _ETH);
+    function increaseFURUSDDebt(uint _amount) external;
 
-    // --- Functions ---
-    function sendETH(address _account, uint _amount) external;
+    function decreaseFURUSDDebt(uint _amount) external;
+
+    function sendFURFI(address _account, uint _amount) external;
+
+    function receiveFURFI(uint _amount) external;
 }
