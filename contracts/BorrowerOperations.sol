@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./abstracts/BaseContract.sol";
 import "./Interfaces/IBorrowerOperations.sol";
 import "./Interfaces/ITroveManager.sol";
+import "./Interfaces/IActivePool.sol";
 import "./Interfaces/IFURUSDToken.sol";
 import "./Interfaces/ICollSurplusPool.sol";
 import "./Interfaces/ISortedTroves.sol";
@@ -102,6 +103,7 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
         address _gasPoolAddress,
         address _collSurplusPoolAddress,
         address _priceFeedAddress,
+        address _averagePriceOracle,
         address _sortedTrovesAddress,
         address _furUSDTokenAddress,
         address _loanStakingAddress,
@@ -121,6 +123,7 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
         checkContract(_gasPoolAddress);
         checkContract(_collSurplusPoolAddress);
         checkContract(_priceFeedAddress);
+        checkContract(_averagePriceOracle);
         checkContract(_sortedTrovesAddress);
         checkContract(_furUSDTokenAddress);
         checkContract(_loanStakingAddress);
@@ -133,6 +136,7 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
         gasPoolAddress = _gasPoolAddress;
         collSurplusPool = ICollSurplusPool(_collSurplusPoolAddress);
         priceFeed = IPriceFeed(_priceFeedAddress);
+        averagePriceOracle = IAveragePriceOracle(_averagePriceOracle);
         sortedTroves = ISortedTroves(_sortedTrovesAddress);
         furUSDToken = IFURUSDToken(_furUSDTokenAddress);
         loanStakingAddress = _loanStakingAddress;
@@ -143,9 +147,12 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
 
     // --- Borrower Trove Operations ---
 
-    function openTrove(uint _maxFeePercentage, uint _FURUSDAmount, address _upperHint, address _lowerHint) external override {
+    function openTrove(uint _maxFeePercentage, uint _FurFiAmount, uint _FURUSDAmount, address _upperHint, address _lowerHint) external override {
         ContractsCache memory contractsCache = ContractsCache(troveManager, activePool, furUSDToken);
         LocalVariables_openTrove memory vars;
+        
+        averagePriceOracle.updateFurFiBNBPrice();
+        uint256 furFiPricePerBNB = averagePriceOracle.getAverageFurFiForOneBNB();
 
         vars.price = priceFeed.fetchPrice();
         bool isRecoveryMode = _checkRecoveryMode(vars.price);
@@ -166,20 +173,20 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
         vars.compositeDebt = _getCompositeDebt(vars.netDebt);
         assert(vars.compositeDebt > 0);
         
-        vars.ICR = LiquityMath._computeCR(msg.value, vars.compositeDebt, vars.price);
-        vars.NICR = LiquityMath._computeNominalCR(msg.value, vars.compositeDebt);
+        vars.ICR = LiquityMath._computeCR(_FurFiAmount, vars.compositeDebt, vars.price);
+        vars.NICR = LiquityMath._computeNominalCR(_FurFiAmount, vars.compositeDebt);
 
         if (isRecoveryMode) {
             _requireICRisAboveCCR(vars.ICR);
         } else {
             _requireICRisAboveMCR(vars.ICR);
-            uint newTCR = _getNewTCRFromTroveChange(msg.value, true, vars.compositeDebt, true, vars.price);  // bools: coll increase, debt increase
+            uint newTCR = _getNewTCRFromTroveChange(_FurFiAmount, true, vars.compositeDebt, true, vars.price);  // bools: coll increase, debt increase
             _requireNewTCRisAboveCCR(newTCR); 
         }
 
         // Set the trove struct's properties
         contractsCache.troveManager.setTroveStatus(msg.sender, 1);
-        contractsCache.troveManager.increaseTroveColl(msg.sender, msg.value);
+        contractsCache.troveManager.increaseTroveColl(msg.sender, _FurFiAmount);
         contractsCache.troveManager.increaseTroveDebt(msg.sender, vars.compositeDebt);
 
         contractsCache.troveManager.updateTroveRewardSnapshots(msg.sender);
@@ -189,54 +196,54 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
         vars.arrayIndex = contractsCache.troveManager.addTroveOwnerToArray(msg.sender);
         emit TroveCreated(msg.sender, vars.arrayIndex);
 
-        // Move the ether to the Active Pool, and mint the FURUSDAmount to the borrower
-        _activePoolAddColl(contractsCache.activePool, msg.value);
+        // Move the FURFI to the Active Pool, and mint the FURUSDAmount to the borrower
+        _activePoolAddColl(contractsCache.activePool, _FurFiAmount);
         _withdrawFURUSD(contractsCache.activePool, contractsCache.furUSDToken, msg.sender, _FURUSDAmount, vars.netDebt);
         // Move the FURUSD gas compensation to the Gas Pool
         _withdrawFURUSD(contractsCache.activePool, contractsCache.furUSDToken, gasPoolAddress, FURUSD_GAS_COMPENSATION, FURUSD_GAS_COMPENSATION);
 
-        emit TroveUpdated(msg.sender, vars.compositeDebt, msg.value, vars.stake, BorrowerOperation.openTrove);
+        emit TroveUpdated(msg.sender, vars.compositeDebt, _FurFiAmount, vars.stake, BorrowerOperation.openTrove);
         emit FURUSDBorrowingFeePaid(msg.sender, vars.FURUSDFee);
     }
 
     // Send FURFI as collateral to a trove
-    function addColl(address _upperHint, address _lowerHint) external override {
-        _adjustTrove(msg.sender, 0, 0, false, _upperHint, _lowerHint, 0);
+    function addColl(uint _collDeposital, address _upperHint, address _lowerHint) external override {
+        _adjustTrove(msg.sender, _collDeposital, 0, 0, false, _upperHint, _lowerHint, 0);
     }
 
     // Send FURFI as collateral to a trove. Called by only the Stability Pool.
-    function moveFURFIGainToTrove(address _borrower, address _upperHint, address _lowerHint) external override {
+    function moveFURFIGainToTrove(address _borrower, uint _collDeposital, address _upperHint, address _lowerHint) external override {
         _requireCallerIsStabilityPool();
-        _adjustTrove(_borrower, 0, 0, false, _upperHint, _lowerHint, 0);
+        _adjustTrove(_borrower, _collDeposital, 0, 0, false, _upperHint, _lowerHint, 0);
     }
 
     // Withdraw FURFI collateral from a trove
     function withdrawColl(uint _collWithdrawal, address _upperHint, address _lowerHint) external override {
-        _adjustTrove(msg.sender, _collWithdrawal, 0, false, _upperHint, _lowerHint, 0);
+        _adjustTrove(msg.sender, 0, _collWithdrawal, 0, false, _upperHint, _lowerHint, 0);
     }
 
     // Withdraw FURUSD tokens from a trove: mint new FURUSD tokens to the owner, and increase the trove's debt accordingly
     function withdrawFURUSD(uint _maxFeePercentage, uint _FURUSDAmount, address _upperHint, address _lowerHint) external override {
-        _adjustTrove(msg.sender, 0, _FURUSDAmount, true, _upperHint, _lowerHint, _maxFeePercentage);
+        _adjustTrove(msg.sender, 0, 0, _FURUSDAmount, true, _upperHint, _lowerHint, _maxFeePercentage);
     }
 
     // Repay FURUSD tokens to a Trove: Burn the repaid FURUSD tokens, and reduce the trove's debt accordingly
     function repayFURUSD(uint _FURUSDAmount, address _upperHint, address _lowerHint) external override {
-        _adjustTrove(msg.sender, 0, _FURUSDAmount, false, _upperHint, _lowerHint, 0);
+        _adjustTrove(msg.sender, 0, 0, _FURUSDAmount, false, _upperHint, _lowerHint, 0);
     }
 
-    function adjustTrove(uint _maxFeePercentage, uint _collWithdrawal, uint _FURUSDChange, bool _isDebtIncrease, address _upperHint, address _lowerHint) external override {
-        _adjustTrove(msg.sender, _collWithdrawal, _FURUSDChange, _isDebtIncrease, _upperHint, _lowerHint, _maxFeePercentage);
+    function adjustTrove(uint _maxFeePercentage, uint _collDeposital, uint _collWithdrawal, uint _FURUSDChange, bool _isDebtIncrease, address _upperHint, address _lowerHint) external override {
+        _adjustTrove(msg.sender, _collDeposital, _collWithdrawal, _FURUSDChange, _isDebtIncrease, _upperHint, _lowerHint, _maxFeePercentage);
     }
 
     /*
     * _adjustTrove(): Alongside a debt change, this function can perform either a collateral top-up or a collateral withdrawal. 
     *
-    * It therefore expects either a positive msg.value, or a positive _collWithdrawal argument.
+    * It therefore expects either a positive _collDeposital, or a positive _collWithdrawal argument.
     *
     * If both are positive, it will revert.
     */
-    function _adjustTrove(address _borrower, uint _collWithdrawal, uint _FURUSDChange, bool _isDebtIncrease, address _upperHint, address _lowerHint, uint _maxFeePercentage) internal {
+    function _adjustTrove(address _borrower, uint _collDeposital, uint _collWithdrawal, uint _FURUSDChange, bool _isDebtIncrease, address _upperHint, address _lowerHint, uint _maxFeePercentage) internal {
         ContractsCache memory contractsCache = ContractsCache(troveManager, activePool, furUSDToken);
         LocalVariables_adjustTrove memory vars;
 
@@ -247,17 +254,17 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
             _requireValidMaxFeePercentage(_maxFeePercentage, isRecoveryMode);
             _requireNonZeroDebtChange(_FURUSDChange);
         }
-        _requireSingularCollChange(_collWithdrawal);
-        _requireNonZeroAdjustment(_collWithdrawal, _FURUSDChange);
+        _requireSingularCollChange(_collDeposital, _collWithdrawal);
+        _requireNonZeroAdjustment(_collDeposital, _collWithdrawal, _FURUSDChange);
         _requireTroveisActive(contractsCache.troveManager, _borrower);
 
         // Confirm the operation is either a borrower adjusting their own trove, or a pure FURFI transfer from the Stability Pool to a trove
-        assert(msg.sender == _borrower || (msg.sender == stabilityPoolAddress && msg.value > 0 && _FURUSDChange == 0));
+        assert(msg.sender == _borrower || (msg.sender == stabilityPoolAddress && _collDeposital > 0 && _FURUSDChange == 0));
 
         contractsCache.troveManager.applyPendingRewards(_borrower);
 
-        // Get the collChange based on whether or not FURFI was sent in the transaction
-        (vars.collChange, vars.isCollIncrease) = _getCollChange(msg.value, _collWithdrawal);
+        // Get the collChange based on FURFI or not FURFI was sent in the transaction
+        (vars.collChange, vars.isCollIncrease) = _getCollChange(_collDeposital, _collWithdrawal);
 
         vars.netDebtChange = _FURUSDChange;
 
@@ -385,7 +392,7 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
         }
     }
 
-    // Update trove's coll and debt based on whether they increase or decrease
+    // Update trove's coll and debt based on whFURFI they increase or decrease
     function _updateTroveFromAdjustment
     (
         ITroveManager _troveManager,
@@ -434,8 +441,7 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
 
     // Send FURFI to Active Pool and increase its recorded FURFI balance
     function _activePoolAddColl(IActivePool _activePool, uint _amount) internal {
-        (bool success, ) = address(_activePool).call{value: _amount}("");
-        require(success, "BorrowerOps: Sending FURFI to ActivePool failed");
+        furFiToken.transferFrom(msg.sender, address(_activePool), _amount);
     }
 
     // Issue the specified amount of FURUSD to _account and increases the total active debt (_netDebtIncrease potentially includes a FURUSDFee)
@@ -452,16 +458,16 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
 
     // --- 'Require' wrapper functions ---
 
-    function _requireSingularCollChange(uint _collWithdrawal) internal view {
-        require(msg.value == 0 || _collWithdrawal == 0, "BorrowerOperations: Cannot withdraw and add coll");
+    function _requireSingularCollChange(uint _collDeposital, uint _collWithdrawal) internal view {
+        require(_collDeposital == 0 || _collWithdrawal == 0, "BorrowerOperations: Cannot withdraw and add coll");
     }
 
     function _requireCallerIsBorrower(address _borrower) internal view {
         require(msg.sender == _borrower, "BorrowerOps: Caller must be the borrower for a withdrawal");
     }
 
-    function _requireNonZeroAdjustment(uint _collWithdrawal, uint _FURUSDChange) internal view {
-        require(msg.value != 0 || _collWithdrawal != 0 || _FURUSDChange != 0, "BorrowerOps: There must be either a collateral change or a debt change");
+    function _requireNonZeroAdjustment(uint _collDeposital, uint _collWithdrawal, uint _FURUSDChange) internal view {
+        require(_collDeposital != 0 || _collWithdrawal != 0 || _FURUSDChange != 0, "BorrowerOps: There must be either a collateral change or a debt change");
     }
 
     function _requireTroveisActive(ITroveManager _troveManager, address _borrower) internal view {

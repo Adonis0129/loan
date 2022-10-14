@@ -21,8 +21,7 @@ contract CollSurplusPool is BaseContract, CheckContract, ICollSurplusPool {
     address public activePoolAddress;
     address public furFiAddress;
 
-    // deposited FURFI tracker
-    uint256 internal FURFI;
+    IERC20Upgradeable furFiToken;
     // Collateral surplus claimable by trove owners
     mapping (address => uint) internal balances;
 
@@ -56,12 +55,12 @@ contract CollSurplusPool is BaseContract, CheckContract, ICollSurplusPool {
         activePoolAddress = _activePoolAddress;
         furFiAddress = _furFiAddress;
 
+        furFiToken = IERC20Upgradeable(_furFiAddress);
+
     }
 
-    /* Returns the FURFI state variable at ActivePool address.
-       Not necessarily equal to the raw FURFI balance - FURFI can be forcibly sent to contracts. */
-    function getFURFI() external view override returns (uint) {
-        return FURFI;
+    function getFURFI() public view override returns (uint) {
+        return furFiToken.balanceOf(address(this));
     }
 
     function getCollateral(address _account) external view override returns (uint) {
@@ -87,19 +86,12 @@ contract CollSurplusPool is BaseContract, CheckContract, ICollSurplusPool {
         balances[_account] = 0;
         emit CollBalanceUpdated(_account, 0);
 
-        FURFI = FURFI.sub(claimableColl);
-        emit CollSurplusPoolFURFIBalanceUpdated(claimableColl);
+        furFiToken.safeTransfer(_account, claimableColl);
+
+        uint256 FURFI = getFURFI();
+        emit CollSurplusPoolFURFIBalanceUpdated(FURFI);
         emit FURFISent(_account, claimableColl);
 
-        IERC20Upgradeable FurFiToken = IERC20Upgradeable(furFiAddress);
-        FurFiToken.safeTransfer(_account, claimableColl);
-    }
-
-    //called by only ActivePool after send FURFI
-    function receiveFURFI(uint _amount) external override {
-        _requireCallerIsActivePool();
-        FURFI = FURFI.add(_amount);
-        emit CollSurplusPoolFURFIBalanceUpdated(_amount);
     }
 
     // --- 'require' functions ---
@@ -121,4 +113,5 @@ contract CollSurplusPool is BaseContract, CheckContract, ICollSurplusPool {
             msg.sender == activePoolAddress,
             "CollSurplusPool: Caller is not Active Pool");
     }
+
 }

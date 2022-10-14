@@ -14,8 +14,8 @@ contract MultiTroveGetter {
         uint coll;
         uint stake;
 
-        uint snapshotETH;
-        uint snapshotLUSDDebt;
+        uint snapshotFURFI;
+        uint snapshotFURUSDDebt;
     }
 
     TroveManager public troveManager; // XXX Troves missing from ITroveManager?
@@ -80,8 +80,8 @@ contract MultiTroveGetter {
                 /* arrayIndex */
             ) = troveManager.Troves(currentTroveowner);
             (
-                _troves[idx].snapshotETH,
-                _troves[idx].snapshotLUSDDebt
+                _troves[idx].snapshotFURFI,
+                _troves[idx].snapshotFURUSDDebt
             ) = troveManager.rewardSnapshots(currentTroveowner);
 
             currentTroveowner = sortedTroves.getNext(currentTroveowner);
@@ -109,8 +109,8 @@ contract MultiTroveGetter {
                 /* arrayIndex */
             ) = troveManager.Troves(currentTroveowner);
             (
-                _troves[idx].snapshotETH,
-                _troves[idx].snapshotLUSDDebt
+                _troves[idx].snapshotFURFI,
+                _troves[idx].snapshotFURUSDDebt
             ) = troveManager.rewardSnapshots(currentTroveowner);
 
             currentTroveowner = sortedTroves.getPrev(currentTroveowner);

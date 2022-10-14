@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./abstracts/BaseContract.sol";
 import './Interfaces/IDefaultPool.sol';
+import "./Interfaces/IActivePool.sol";
 import "./Dependencies/CheckContract.sol";
 
 /*
@@ -24,9 +25,10 @@ contract DefaultPool is BaseContract, CheckContract, IDefaultPool {
 
     address public troveManagerAddress;
     address public activePoolAddress;
-    uint256 internal FURFI;  // deposited FURFI tracker
     uint256 internal FURUSDDebt;  // debt
     address public furFiAddress;
+
+    IERC20Upgradeable furFiToken;
 
     // --- Events ---
     event DefaultPoolFURUSDDebtUpdated(uint _LUSDDebt);
@@ -54,17 +56,12 @@ contract DefaultPool is BaseContract, CheckContract, IDefaultPool {
         troveManagerAddress = _troveManagerAddress;
         activePoolAddress = _activePoolAddress;
         furFiAddress = _furFiAddress;
+
+        furFiToken = IERC20Upgradeable(_furFiAddress);
     }
 
-    // --- Getters for public variables. Required by IPool interface ---
-
-    /*
-    * Returns the FURFI state variable.
-    *
-    * Not necessarily equal to the the contract's raw FURFI balance - ether can be forcibly sent to contracts.
-    */
-    function getFURFI() external view override returns (uint) {
-        return FURFI;
+    function getFURFI() public view override returns (uint) {
+        return furFiToken.balanceOf(address(this));
     }
 
     function getFURUSDDebt() external view override returns (uint) {
@@ -75,20 +72,12 @@ contract DefaultPool is BaseContract, CheckContract, IDefaultPool {
 
     function sendFURFIToActivePool(uint _amount) external override {
         _requireCallerIsTroveManager();
-        address activePool = activePoolAddress; // cache to save an SLOAD
-        FURFI = FURFI.sub(_amount);
-        emit DefaultPoolFURFIBalanceUpdated(FURFI);
-        emit FURFISent(activePool, _amount);
+        furFiToken.safeTransfer(activePoolAddress, _amount);
 
-        IERC20Upgradeable FurFiToken = IERC20Upgradeable(furFiAddress);
-        FurFiToken.safeTransfer(activePool, _amount);
-    }
-
-    //called by only ActivePool after send FURFI
-    function receiveFURFI(uint _amount) external override {
-        _requireCallerIsActivePool();
-        FURFI = FURFI.add(_amount);
+        uint256 FURFI = getFURFI();
         emit DefaultPoolFURFIBalanceUpdated(FURFI);
+        emit FURFISent(activePoolAddress, _amount);
+
     }
 
     function increaseFURUSDDebt(uint _amount) external override {

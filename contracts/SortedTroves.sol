@@ -1,48 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "./abstracts/BaseContract.sol";
 import "./Interfaces/ISortedTroves.sol";
 import "./Interfaces/ITroveManager.sol";
 import "./Interfaces/IBorrowerOperations.sol";
-import "./Dependencies/SafeMath.sol";
-import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
-import "./Dependencies/console.sol";
 
-/*
-* A sorted doubly linked list with nodes sorted in descending order.
-*
-* Nodes map to active Troves in the system - the ID property is the address of a Trove owner.
-* Nodes are ordered according to their current nominal individual collateral ratio (NICR),
-* which is like the ICR but without the price, i.e., just collateral / debt.
-*
-* The list optionally accepts insert position hints.
-*
-* NICRs are computed dynamically at runtime, and not stored on the Node. This is because NICRs of active Troves
-* change dynamically as liquidation events occur.
-*
-* The list relies on the fact that liquidation events preserve ordering: a liquidation decreases the NICRs of all active Troves,
-* but maintains their order. A node inserted based on current NICR will maintain the correct position,
-* relative to it's peers, as rewards accumulate, as long as it's raw collateral and debt have not changed.
-* Thus, Nodes remain sorted by current NICR.
-*
-* Nodes need only be re-inserted upon a Trove operation - when the owner adds or removes collateral or debt
-* to their position.
-*
-* The list is a modification of the following audited SortedDoublyLinkedList:
-* https://github.com/livepeer/protocol/blob/master/contracts/libraries/SortedDoublyLL.sol
-*
-*
-* Changes made in the Liquity implementation:
-*
-* - Keys have been removed from nodes
-*
-* - Ordering checks for insertion are performed by comparing an NICR argument to the current NICR, calculated at runtime.
-*   The list relies on the property that ordering by ICR is maintained as the ETH:USD price varies.
-*
-* - Public functions with parameters have been made internal to save gas, and given an external wrapper function for external access
-*/
-contract SortedTroves is Ownable, CheckContract, ISortedTroves {
+
+contract SortedTroves is BaseContract, CheckContract, ISortedTroves {
     using SafeMath for uint256;
 
     string constant public NAME = "SortedTroves";
@@ -74,10 +41,14 @@ contract SortedTroves is Ownable, CheckContract, ISortedTroves {
 
     Data public data;
 
+    function initialize() public initializer {
+        __BaseContract_init();
+    }
+
     // --- Dependency setters ---
 
     function setParams(uint256 _size, address _troveManagerAddress, address _borrowerOperationsAddress) external override onlyOwner {
-        require(_size > 0, "SortedTroves: Size can’t be zero");
+        require(_size > 0, "SortedTroves: Size can not be zero");
         checkContract(_troveManagerAddress);
         checkContract(_borrowerOperationsAddress);
 
@@ -88,8 +59,6 @@ contract SortedTroves is Ownable, CheckContract, ISortedTroves {
 
         emit TroveManagerAddressChanged(_troveManagerAddress);
         emit BorrowerOperationsAddressChanged(_borrowerOperationsAddress);
-
-        _renounceOwnership();
     }
 
     /*

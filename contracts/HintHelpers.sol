@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import "./abstracts/BaseContract.sol";
 import "./Interfaces/ITroveManager.sol";
 import "./Interfaces/ISortedTroves.sol";
 import "./Dependencies/LiquityBase.sol";
-import "./Dependencies/Ownable.sol";
 import "./Dependencies/CheckContract.sol";
 
-contract HintHelpers is LiquityBase, Ownable, CheckContract {
+contract HintHelpers is BaseContract, LiquityBase, CheckContract {
     string constant public NAME = "HintHelpers";
 
     ISortedTroves public sortedTroves;
@@ -36,22 +36,25 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         emit SortedTrovesAddressChanged(_sortedTrovesAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
 
-        _renounceOwnership();
+    }
+
+    function initialize() public initializer {
+        __BaseContract_init();
     }
 
     // --- Functions ---
 
     /* getRedemptionHints() - Helper function for finding the right hints to pass to redeemCollateral().
      *
-     * It simulates a redemption of `_LUSDamount` to figure out where the redemption sequence will start and what state the final Trove
+     * It simulates a redemption of `_FURUSDamount` to figure out where the redemption sequence will start and what state the final Trove
      * of the sequence will end up in.
      *
      * Returns three hints:
      *  - `firstRedemptionHint` is the address of the first Trove with ICR >= MCR (i.e. the first Trove that will be redeemed).
      *  - `partialRedemptionHintNICR` is the final nominal ICR of the last Trove of the sequence after being hit by partial redemption,
      *     or zero in case of no partial redemption.
-     *  - `truncatedLUSDamount` is the maximum amount that can be redeemed out of the the provided `_LUSDamount`. This can be lower than
-     *    `_LUSDamount` when redeeming the full amount would leave the last Trove of the redemption sequence with less net debt than the
+     *  - `truncatedFURUSDamount` is the maximum amount that can be redeemed out of the the provided `_FURUSDamount`. This can be lower than
+     *    `_FURUSDamount` when redeeming the full amount would leave the last Trove of the redemption sequence with less net debt than the
      *    minimum allowed value (i.e. MIN_NET_DEBT).
      *
      * The number of Troves to consider for redemption can be capped by passing a non-zero value as `_maxIterations`, while passing zero
@@ -59,7 +62,7 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
      */
 
     function getRedemptionHints(
-        uint _LUSDamount, 
+        uint _FURUSDamount, 
         uint _price,
         uint _maxIterations
     )
@@ -68,12 +71,12 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
         returns (
             address firstRedemptionHint,
             uint partialRedemptionHintNICR,
-            uint truncatedLUSDamount
+            uint truncatedFURUSDamount
         )
     {
         ISortedTroves sortedTrovesCached = sortedTroves;
 
-        uint remainingLUSD = _LUSDamount;
+        uint remainingFURUSD = _FURUSDamount;
         address currentTroveuser = sortedTrovesCached.getLast();
 
         while (currentTroveuser != address(0) && troveManager.getCurrentICR(currentTroveuser, _price) < MCR) {
@@ -86,34 +89,34 @@ contract HintHelpers is LiquityBase, Ownable, CheckContract {
             _maxIterations = uint(-1);
         }
 
-        while (currentTroveuser != address(0) && remainingLUSD > 0 && _maxIterations-- > 0) {
-            uint netLUSDDebt = _getNetDebt(troveManager.getTroveDebt(currentTroveuser))
-                .add(troveManager.getPendingLUSDDebtReward(currentTroveuser));
+        while (currentTroveuser != address(0) && remainingFURUSD > 0 && _maxIterations-- > 0) {
+            uint netFURUSDDebt = _getNetDebt(troveManager.getTroveDebt(currentTroveuser))
+                .add(troveManager.getPendingFURUSDDebtReward(currentTroveuser));
 
-            if (netLUSDDebt > remainingLUSD) {
-                if (netLUSDDebt > MIN_NET_DEBT) {
-                    uint maxRedeemableLUSD = LiquityMath._min(remainingLUSD, netLUSDDebt.sub(MIN_NET_DEBT));
+            if (netFURUSDDebt > remainingFURUSD) {
+                if (netFURUSDDebt > MIN_NET_DEBT) {
+                    uint maxRedeemableFURUSD = LiquityMath._min(remainingFURUSD, netFURUSDDebt.sub(MIN_NET_DEBT));
 
-                    uint ETH = troveManager.getTroveColl(currentTroveuser)
-                        .add(troveManager.getPendingETHReward(currentTroveuser));
+                    uint FURFI = troveManager.getTroveColl(currentTroveuser)
+                        .add(troveManager.getPendingFURFIReward(currentTroveuser));
 
-                    uint newColl = ETH.sub(maxRedeemableLUSD.mul(DECIMAL_PRECISION).div(_price));
-                    uint newDebt = netLUSDDebt.sub(maxRedeemableLUSD);
+                    uint newColl = FURFI.sub(maxRedeemableFURUSD.mul(DECIMAL_PRECISION).div(_price));
+                    uint newDebt = netFURUSDDebt.sub(maxRedeemableFURUSD);
 
                     uint compositeDebt = _getCompositeDebt(newDebt);
                     partialRedemptionHintNICR = LiquityMath._computeNominalCR(newColl, compositeDebt);
 
-                    remainingLUSD = remainingLUSD.sub(maxRedeemableLUSD);
+                    remainingFURUSD = remainingFURUSD.sub(maxRedeemableFURUSD);
                 }
                 break;
             } else {
-                remainingLUSD = remainingLUSD.sub(netLUSDDebt);
+                remainingFURUSD = remainingFURUSD.sub(netFURUSDDebt);
             }
 
             currentTroveuser = sortedTrovesCached.getPrev(currentTroveuser);
         }
 
-        truncatedLUSDamount = _LUSDamount.sub(remainingLUSD);
+        truncatedFURUSDamount = _FURUSDamount.sub(remainingFURUSD);
     }
 
     /* getApproxHint() - return address of a Trove that is, on average, (length / numTrials) positions away in the 
