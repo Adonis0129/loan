@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import "./abstracts/BaseContract.sol";
 import "./Interfaces/ITroveManager.sol";
@@ -8,6 +8,13 @@ import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/CheckContract.sol";
 
 contract HintHelpers is BaseContract, LiquityBase, CheckContract {
+
+    using SafeMath for uint;
+
+    function initialize() public initializer {
+        __BaseContract_init();
+    }
+
     string constant public NAME = "HintHelpers";
 
     ISortedTroves public sortedTroves;
@@ -36,10 +43,6 @@ contract HintHelpers is BaseContract, LiquityBase, CheckContract {
         emit SortedTrovesAddressChanged(_sortedTrovesAddress);
         emit TroveManagerAddressChanged(_troveManagerAddress);
 
-    }
-
-    function initialize() public initializer {
-        __BaseContract_init();
     }
 
     // --- Functions ---
@@ -86,7 +89,7 @@ contract HintHelpers is BaseContract, LiquityBase, CheckContract {
         firstRedemptionHint = currentTroveuser;
 
         if (_maxIterations == 0) {
-            _maxIterations = uint(-1);
+            _maxIterations = type(uint).max;
         }
 
         while (currentTroveuser != address(0) && remainingFURUSD > 0 && _maxIterations-- > 0) {

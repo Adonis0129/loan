@@ -1,14 +1,48 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "./abstracts/BaseContract.sol";
 import "./Interfaces/IPriceFeed.sol";
-import "./Interfaces/ITellorCaller.sol";
-import "./Dependencies/AggregatorV3Interface.sol";
-import "./Dependencies/SafeMath.sol";
-import "./Dependencies/Ownable.sol";
-import "./Dependencies/CheckContract.sol";
 import "./Dependencies/BaseMath.sol";
 import "./Dependencies/LiquityMath.sol";
+
+
+interface ITellorCaller {
+    function getTellorCurrentValue(uint256 _requestId) external view returns (bool, uint256, uint256);
+}
+
+interface AggregatorV3Interface {
+
+  function decimals() external view returns (uint8);
+  function description() external view returns (string memory);
+  function version() external view returns (uint256);
+
+  // getRoundData and latestRoundData should both raise "No data present"
+  // if they do not have data to report, instead of returning unset values
+  // which could be misinterpreted as actual reported values.
+  function getRoundData(uint80 _roundId)
+    external
+    view
+    returns (
+      uint80 roundId,
+      int256 answer,
+      uint256 startedAt,
+      uint256 updatedAt,
+      uint80 answeredInRound
+    );
+
+  function latestRoundData()
+    external
+    view
+    returns (
+      uint80 roundId,
+      int256 answer,
+      uint256 startedAt,
+      uint256 updatedAt,
+      uint80 answeredInRound
+    );
+}
 
 /*
 * PriceFeed for mainnet deployment, to be connected to Chainlink's live ETH:USD aggregator reference 
@@ -18,8 +52,13 @@ import "./Dependencies/LiquityMath.sol";
 * switching oracles based on oracle failures, timeouts, and conditions for returning to the primary
 * Chainlink oracle.
 */
-contract PriceFeed is Ownable, CheckContract, BaseMath, IPriceFeed {
+contract PriceFeed is BaseContract, BaseMath, IPriceFeed {
+    
     using SafeMath for uint256;
+
+    function initialize() public initializer {
+        __BaseContract_init();
+    }
 
     string constant public NAME = "PriceFeed";
 
@@ -89,9 +128,7 @@ contract PriceFeed is Ownable, CheckContract, BaseMath, IPriceFeed {
         external
         onlyOwner
     {
-        checkContract(_priceAggregatorAddress);
-        checkContract(_tellorCallerAddress);
-       
+
         priceAggregator = AggregatorV3Interface(_priceAggregatorAddress);
         tellorCaller = ITellorCaller(_tellorCallerAddress);
 
@@ -107,7 +144,6 @@ contract PriceFeed is Ownable, CheckContract, BaseMath, IPriceFeed {
 
         _storeChainlinkPrice(chainlinkResponse);
 
-        _renounceOwnership();
     }
 
     // --- Functions ---

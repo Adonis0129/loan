@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
-import "./Interfaces/IFURUSDToken.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "./abstracts/BaseContract.sol";
@@ -9,6 +8,7 @@ import "./Dependencies/CheckContract.sol";
 
 
 contract FURUSDToken is BaseContract, CheckContract, ERC20Upgradeable {
+    
     using SafeMath for uint256;
     
     // --- Addresses ---

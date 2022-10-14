@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../abstracts/BaseContract.sol";
@@ -51,17 +51,17 @@ contract LockupContractFactory is BaseContract, ILockupContractFactory, CheckCon
         emit LOANTokenAddressSet(_loanTokenAddress);
     }
 
-    function deployLockupContract(address _beneficiary, uint _unlockTime) external override {
-        address loanTokenAddressCached = loanTokenAddress;
-        _requireLOANAddressIsSet(loanTokenAddressCached);
-        LockupContract lockupContract = new LockupContract(
-                                                        loanTokenAddressCached,
-                                                        _beneficiary, 
-                                                        _unlockTime);
+    // function deployLockupContract(address _beneficiary, uint _unlockTime) external override {
+    //     address loanTokenAddressCached = loanTokenAddress;
+    //     _requireLOANAddressIsSet(loanTokenAddressCached);
+    //     LockupContract lockupContract = new LockupContract(
+    //                                                     loanTokenAddressCached,
+    //                                                     _beneficiary, 
+    //                                                     _unlockTime);
 
-        lockupContractToDeployer[address(lockupContract)] = msg.sender;
-        emit LockupContractDeployedThroughFactory(address(lockupContract), _beneficiary, _unlockTime, msg.sender);
-    }
+    //     lockupContractToDeployer[address(lockupContract)] = msg.sender;
+    //     emit LockupContractDeployedThroughFactory(address(lockupContract), _beneficiary, _unlockTime, msg.sender);
+    // }
 
     function isRegisteredLockup(address _contractAddress) public view override returns (bool) {
         return lockupContractToDeployer[_contractAddress] != address(0);

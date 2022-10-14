@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
-import "./ILiquityBase.sol";
 import "./IStabilityPool.sol";
 import "./IFURUSDToken.sol";
 import "./ILOANToken.sol";
@@ -10,13 +9,8 @@ import "./ILOANStaking.sol";
 
 
 // Common interface for the Trove Manager.
-interface ITroveManager is ILiquityBase {
+interface ITroveManager {
     
-    function stabilityPool() external view returns (IStabilityPool);
-    function furUSDToken() external view returns (IFURUSDToken);
-    function lqtyToken() external view returns (ILOANToken);
-    function lqtyStaking() external view returns (ILOANStaking);
-
     function getTroveOwnersCount() external view returns (uint);
 
     function getTroveFromTroveOwnersArray(uint _index) external view returns (address);

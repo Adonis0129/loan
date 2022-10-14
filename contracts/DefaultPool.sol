@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -21,6 +21,10 @@ contract DefaultPool is BaseContract, CheckContract, IDefaultPool {
     using SafeMath for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
+    function initialize() public initializer {
+        __BaseContract_init();
+    }
+
     string constant public NAME = "DefaultPool";
 
     address public troveManagerAddress;
@@ -34,10 +38,6 @@ contract DefaultPool is BaseContract, CheckContract, IDefaultPool {
     event DefaultPoolFURUSDDebtUpdated(uint _LUSDDebt);
     event DefaultPoolFURFIBalanceUpdated(uint _FURFI);
     event FURFISent(address _to, uint _amount);
-
-    function initialize() public initializer {
-        __BaseContract_init();
-    }
 
     // --- Dependency setters ---
 

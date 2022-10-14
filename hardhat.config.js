@@ -52,7 +52,7 @@ module.exports = {
         },
       },
       {
-        version: "0.6.12",
+        version: "0.6.11",
         settings: {
           optimizer: {
             enabled: true,

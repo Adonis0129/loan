@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -17,6 +17,8 @@ import "./Dependencies/CheckContract.sol";
 
 
 contract StabilityPool is BaseContract, LiquityBase, CheckContract, IStabilityPool {
+
+    using SafeMath for uint;
 
     function initialize() public initializer {
         __BaseContract_init();
@@ -692,12 +694,10 @@ contract StabilityPool is BaseContract, LiquityBase, CheckContract, IStabilityPo
 
     function _sendFURFIGainToDepositor(uint _amount) internal {
         if (_amount == 0) {return;}
-        uint newFURFI = FURFI.sub(_amount);
-        FURFI = newFURFI;
-        emit StabilityPoolFURFIBalanceUpdated(newFURFI);
-        emit FURFISent(msg.sender, _amount);
-
         furFiToken.safeTransfer(msg.sender, _amount);
+        uint256 FURFI = getFURFI();
+        emit StabilityPoolFURFIBalanceUpdated(FURFI);
+        emit FURFISent(msg.sender, _amount);
     }
 
     // Send FURUSD to user and decrease FURUSD in Pool
