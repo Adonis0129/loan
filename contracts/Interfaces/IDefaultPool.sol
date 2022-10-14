@@ -13,6 +13,4 @@ interface IDefaultPool {
 
     function sendFURFIToActivePool(uint _amount) external;
 
-    function receiveFURFI(uint _amount) external;
-
 }

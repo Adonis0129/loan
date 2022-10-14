@@ -13,5 +13,4 @@ interface IActivePool {
 
     function sendFURFI(address _account, uint _amount) external;
 
-    function receiveFURFI(uint _amount) external;
 }

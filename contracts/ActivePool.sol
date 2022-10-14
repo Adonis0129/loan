@@ -27,8 +27,10 @@ contract ActivePool is BaseContract, CheckContract, IActivePool {
     address public stabilityPoolAddress;
     address public defaultPoolAddress;
     address public furFiAddress;
-    uint256 internal FURFI;  // deposited FURFI tracker
     uint256 internal FURUSDDebt;
+
+    IERC20Upgradeable furFiToken;
+
 
     // --- Events ---
     event ActivePoolFURUSDDebtUpdated(uint _FURUSDDebt);
@@ -62,17 +64,15 @@ contract ActivePool is BaseContract, CheckContract, IActivePool {
         stabilityPoolAddress = _stabilityPoolAddress;
         defaultPoolAddress = _defaultPoolAddress;
         furFiAddress = _furFiAddress;
+
+        furFiToken = IERC20Upgradeable(_furFiAddress);
+
     }
 
     // --- Getters for public variables. Required by IPool interface ---
 
-    /*
-    * Returns the FURFI state variable.
-    *
-    *Not necessarily equal to the the contract's raw FURFI balance - FURFI can be forcibly sent to contracts.
-    */
-    function getFURFI() external view override returns (uint) {
-        return FURFI;
+    function getFURFI() public view override returns (uint) {
+        return furFiToken.balanceOf(address(this));
     }
 
     function getFURUSDDebt() external view override returns (uint) {
@@ -83,19 +83,11 @@ contract ActivePool is BaseContract, CheckContract, IActivePool {
 
     function sendFURFI(address _account, uint _amount) external override {
         _requireCallerIsBOorTroveMorSP();
-        FURFI = FURFI.sub(_amount);
+        furFiToken.safeTransfer(_account, _amount);
+        
+        uint256 FURFI = getFURFI();
         emit ActivePoolFURFIBalanceUpdated(FURFI);
         emit FURFISent(_account, _amount);
-
-        IERC20Upgradeable FurFiToken = IERC20Upgradeable(furFiAddress);
-        FurFiToken.safeTransfer(_account, _amount);
-    }
-
-    //called by only BorrowerOperrations or DefaultPool after send FURFI
-    function receiveFURFI(uint _amount) external override {
-        _requireCallerIsBorrowerOperationsOrDefaultPool();
-        FURFI = FURFI.add(_amount);
-        emit ActivePoolFURFIBalanceUpdated(FURFI);
     }
 
     function increaseFURUSDDebt(uint _amount) external override {
@@ -133,4 +125,5 @@ contract ActivePool is BaseContract, CheckContract, IActivePool {
             msg.sender == troveManagerAddress,
             "ActivePool: Caller is neither BorrowerOperations nor TroveManager");
     }
+
 }

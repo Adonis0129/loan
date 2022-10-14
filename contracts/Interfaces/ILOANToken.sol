@@ -2,9 +2,7 @@
 
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-
-interface ILOANToken is IERC20Upgradeable { 
+interface ILOANToken { 
    
     function sendToLOANStaking(address _sender, uint256 _amount) external;
 

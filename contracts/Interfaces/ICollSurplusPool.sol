@@ -11,5 +11,4 @@ interface ICollSurplusPool {
 
     function claimColl(address _account) external;
 
-    function receiveFURFI(uint _amount) external;
 }
