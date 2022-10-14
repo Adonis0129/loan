@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
@@ -8,7 +8,7 @@ import "../Dependencies/CheckContract.sol";
 import "../Interfaces/ILOANToken.sol";
 import "../Interfaces/ILockupContractFactory.sol";
 
-contract LOANToken is BaseContract, ERC20Upgradeable, CheckContract, ILOANToken {
+contract LOANToken is BaseContract, ERC20Upgradeable, CheckContract {
     using SafeMath for uint256;
 
     // --- LOANToken specific data ---
@@ -116,15 +116,15 @@ contract LOANToken is BaseContract, ERC20Upgradeable, CheckContract, ILOANToken 
         return true;
     }
 
-    function getDeploymentStartTime() external view override returns (uint256) {
+    function getDeploymentStartTime() external view returns (uint256) {
         return deploymentStartTime;
     }
 
-    function getLpRewardsEntitlement() external view override returns (uint256) {
+    function getLpRewardsEntitlement() external view returns (uint256) {
         return lpRewardsEntitlement;
     }
 
-    function sendToLOANStaking(address _sender, uint256 _amount) external override{
+    function sendToLOANStaking(address _sender, uint256 _amount) external {
         _requireCallerIsLOANStaking();
         if (_isFirstYear()) { _requireSenderIsNotMultisig(_sender); }  // Prevent the multisig from staking LOAN
         super._transfer(_sender, loanStakingAddress, _amount);

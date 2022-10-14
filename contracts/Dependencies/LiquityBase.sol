@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import "./BaseMath.sol";
 import "./LiquityMath.sol";
@@ -8,13 +8,12 @@ import "../Interfaces/IActivePool.sol";
 import "../Interfaces/IDefaultPool.sol";
 import "../Interfaces/IPriceFeed.sol";
 import "../Interfaces/IAveragePriceOracle.sol";
-import "../Interfaces/ILiquityBase.sol";
 
 /* 
 * Base contract for TroveManager, BorrowerOperations and StabilityPool. Contains global system constants and
 * common functions. 
 */
-contract LiquityBase is BaseMath, ILiquityBase {
+contract LiquityBase is BaseMath {
     using SafeMath for uint;
 
     uint constant public _100pct = 1000000000000000000; // 1e18 == 100%
@@ -40,7 +39,7 @@ contract LiquityBase is BaseMath, ILiquityBase {
 
     IDefaultPool public defaultPool;
 
-    IPriceFeed public override priceFeed;
+    IPriceFeed public priceFeed;
 
     IAveragePriceOracle public averagePriceOracle;
 

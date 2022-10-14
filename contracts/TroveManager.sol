@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import "./abstracts/BaseContract.sol";
 import "./Interfaces/ITroveManager.sol";
@@ -14,6 +14,8 @@ import "./Dependencies/CheckContract.sol";
 
 contract TroveManager is BaseContract, LiquityBase, CheckContract, ITroveManager {
 
+    using SafeMath for uint;
+
     function initialize() public initializer {
         __BaseContract_init();
     }
@@ -24,17 +26,17 @@ contract TroveManager is BaseContract, LiquityBase, CheckContract, ITroveManager
 
     address public borrowerOperationsAddress;
 
-    IStabilityPool public override stabilityPool;
+    IStabilityPool public stabilityPool;
 
     address gasPoolAddress;
 
     ICollSurplusPool collSurplusPool;
 
-    IFURUSDToken public override furUSDToken;
+    IFURUSDToken public furUSDToken;
 
-    ILOANToken public override loanToken;
+    ILOANToken public  loanToken;
 
-    ILOANStaking public override loanStaking;
+    ILOANStaking public  loanStaking;
 
     // A doubly linked list of Troves, sorted by their sorted by their collateral ratios
     ISortedTroves public sortedTroves;
@@ -382,7 +384,7 @@ contract TroveManager is BaseContract, LiquityBase, CheckContract, ITroveManager
             assert(_FURUSDInStabPool != 0);
 
             _removeStake(_borrower);
-            singleLiquidation =          dddddddddd(singleLiquidation.entireTroveDebt, singleLiquidation.entireTroveColl, _price);
+            singleLiquidation =_getCappedOffsetVals(singleLiquidation.entireTroveDebt, singleLiquidation.entireTroveColl, _price);
 
             _closeTrove(_borrower, Status.closedByLiquidation);
             if (singleLiquidation.collSurplus > 0) {
@@ -403,8 +405,7 @@ contract TroveManager is BaseContract, LiquityBase, CheckContract, ITroveManager
     /* In a full liquidation, returns the values for a trove's coll and debt to be offset, and coll and debt to be
     * redistributed to active troves.
     */
-    function _getOffsetAndRedistributionVals
-    (
+    function _getOffsetAndRedistributionVals(
         uint _debt,
         uint _coll,
         uint _FURUSDInStabPool
@@ -945,7 +946,7 @@ contract TroveManager is BaseContract, LiquityBase, CheckContract, ITroveManager
         }
 
         // Loop through the Troves starting from the one with lowest collateral ratio until _amount of FURUSD is exchanged for collateral
-        if (_maxIterations == 0) { _maxIterations = uint(-1); }
+        if (_maxIterations == 0) { _maxIterations = type(uint).max; }
         while (currentBorrower != address(0) && totals.remainingFURUSD > 0 && _maxIterations > 0) {
             _maxIterations--;
             // Save the address of the Trove preceding the current one, before potentially modifying the list

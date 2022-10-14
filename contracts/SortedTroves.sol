@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./abstracts/BaseContract.sol";
@@ -10,7 +10,13 @@ import "./Dependencies/CheckContract.sol";
 
 
 contract SortedTroves is BaseContract, CheckContract, ISortedTroves {
+
     using SafeMath for uint256;
+
+    function initialize() public initializer {
+        __BaseContract_init();
+    }
+
 
     string constant public NAME = "SortedTroves";
 
@@ -40,10 +46,6 @@ contract SortedTroves is BaseContract, CheckContract, ISortedTroves {
     }
 
     Data public data;
-
-    function initialize() public initializer {
-        __BaseContract_init();
-    }
 
     // --- Dependency setters ---
 
@@ -166,7 +168,7 @@ contract SortedTroves is BaseContract, CheckContract, ISortedTroves {
 
         delete data.nodes[_id];
         data.size = data.size.sub(1);
-        NodeRemoved(_id);
+        emit NodeRemoved(_id);
     }
 
     /*

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import "../abstracts/BaseContract.sol";
 import "../Interfaces/ILOANToken.sol";
@@ -47,7 +47,7 @@ contract CommunityIssuance is BaseContract, ICommunityIssuance, CheckContract, B
     address public stabilityPoolAddress;
 
     uint public totalLOANIssued;
-    uint public immutable deploymentTime;
+    uint public deploymentTime;
 
     // --- Events ---
 

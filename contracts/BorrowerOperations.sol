@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -15,9 +15,15 @@ import "./Dependencies/LiquityBase.sol";
 import "./Dependencies/CheckContract.sol";
 
 contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrowerOperations {
-    string constant public NAME = "BorrowerOperations";
-    using SafeERC20Upgradeable for IERC20Upgradeable;
 
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeMath for uint;
+
+    function initialize() public initializer {
+        __BaseContract_init();
+    }
+
+    string constant public NAME = "BorrowerOperations";
 
     // --- Connected contract declarations ---
 
@@ -85,13 +91,8 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
 
     // --- Events ---
     event TroveCreated(address indexed _borrower, uint arrayIndex);
-    event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint stake, uint8 operation);
+    event TroveUpdated(address indexed _borrower, uint _debt, uint _coll, uint stake, BorrowerOperation indexed operation);
     event FURUSDBorrowingFeePaid(address indexed _borrower, uint _FURUSDFee);
-
-    function initialize() public initializer {
-        __BaseContract_init();
-    }
-
     
     // --- Dependency setters ---
 
@@ -152,7 +153,7 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
         LocalVariables_openTrove memory vars;
         
         averagePriceOracle.updateFurFiBNBPrice();
-        uint256 furFiPricePerBNB = averagePriceOracle.getAverageFurFiForOneBNB();
+        // uint256 furFiPricePerBNB = averagePriceOracle.getAverageFurFiForOneBNB();
 
         vars.price = priceFeed.fetchPrice();
         bool isRecoveryMode = _checkRecoveryMode(vars.price);
@@ -165,7 +166,7 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
 
         if (!isRecoveryMode) {
             vars.FURUSDFee = _triggerBorrowingFee(contractsCache.troveManager, contractsCache.furUSDToken, _FURUSDAmount, _maxFeePercentage);
-            vars.netDebt = vars.netDebt.add(vars.FURUSDFee);
+            vars.netDebt += vars.FURUSDFee;
         }
         _requireAtLeastMinNetDebt(vars.netDebt);
 
@@ -458,7 +459,7 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
 
     // --- 'Require' wrapper functions ---
 
-    function _requireSingularCollChange(uint _collDeposital, uint _collWithdrawal) internal view {
+    function _requireSingularCollChange(uint _collDeposital, uint _collWithdrawal) internal pure {
         require(_collDeposital == 0 || _collWithdrawal == 0, "BorrowerOperations: Cannot withdraw and add coll");
     }
 
@@ -466,7 +467,7 @@ contract BorrowerOperations is BaseContract, LiquityBase, CheckContract, IBorrow
         require(msg.sender == _borrower, "BorrowerOps: Caller must be the borrower for a withdrawal");
     }
 
-    function _requireNonZeroAdjustment(uint _collDeposital, uint _collWithdrawal, uint _FURUSDChange) internal view {
+    function _requireNonZeroAdjustment(uint _collDeposital, uint _collWithdrawal, uint _FURUSDChange) internal pure {
         require(_collDeposital != 0 || _collWithdrawal != 0 || _FURUSDChange != 0, "BorrowerOps: There must be either a collateral change or a debt change");
     }
 
